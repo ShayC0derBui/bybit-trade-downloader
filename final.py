@@ -5,6 +5,7 @@ from mysql.connector import Error
 import requests
 import gzip
 import re
+import shutil
 
 # Define your MySQL connection parameters
 host = "tonnochycapital.com"
@@ -55,9 +56,9 @@ def insert_rows(data, cursor, connection):
 # Replace this with the base URL of your directory listing
 base_url = "https://public.bybit.com/trading/"
 
-# Check if the "temp" directory exists and replace it if it does
+# Check if the "temp" directory exists and delete it if it does
 if os.path.exists("temp"):
-    os.rmdir("temp")
+    shutil.rmtree("temp")
 
 # Create a "temp" directory
 os.makedirs("temp")
@@ -69,6 +70,15 @@ if response.status_code == 200:
 
     # Use regular expressions to extract links to contracts
     contract_links = re.findall(r'<a href="([^"]+/)">.*?</a>', page_content)
+
+    # Create a single MySQL connection for all CSVs
+    connection = mysql.connector.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=database
+    )
+    cursor = connection.cursor()
 
     for contract_link in contract_links:
         contract_url = base_url + contract_link
@@ -105,51 +115,25 @@ if response.status_code == 200:
                         df = pd.read_csv(extracted_file_path)
                         data = [tuple(row) for row in df.values]
 
-                        # Connect to the MySQL database
-                        try:
-                            connection = mysql.connector.connect(
-                                host=host,
-                                user=user,
-                                password=password,
-                                database=database
-                            )
-
-                            if connection.is_connected():
-                                cursor = connection.cursor()
-
-                                # Create or replace the table schema
-                                create_table(cursor)
-
-                                # Insert rows into the database and commit after every 500 rows
-                                batch_size = 10000
-                                for i in range(0, len(data), batch_size):
-                                    insert_rows(data[i:i + batch_size], cursor, connection)
-
-                                cursor.close()
-                        except Error as e:
-                            print(f"Error: {e}")
-                        finally:
-                            if connection.is_connected():
-                                connection.close()
+                        # Insert the CSV data into the database
+                        batch_size = 200000
+                        for i in range(0, len(data), batch_size):
+                            insert_rows(data[i:i + batch_size], cursor, connection)
+                        
                         os.remove(extracted_file_path)  # Delete the downloaded and extracted CSV file
 
                     else:
                         print(f"Downloaded: {csv_file_path}")
 
-                    
                 else:
                     print(f"Failed to download: {csv_link}")
 
-    # Remove the temporary directory and its contents
-    for file in os.listdir("temp"):
-        file_path = os.path.join("temp", file)
-        try:
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-        except Exception as e:
-            print(f"Error deleting file: {e}")
+    # Close the cursor and connection after all CSVs are processed
+    cursor.close()
+    connection.close()
 
-    os.rmdir("temp")
+    # Recursively delete the "temp" directory and its contents
+    shutil.rmtree("temp")
 
 else:
     print("Failed to access the directory listing.")
