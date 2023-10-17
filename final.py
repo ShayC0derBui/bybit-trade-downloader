@@ -14,6 +14,15 @@ password = "jr5NkkkjKK&M@f5HtgL&5HYN9bSt!fd@Vz9*#cg@3Hmdt#sfhyRGyTQ2C%xV73zp"
 database = "exchanges_data"
 table_name = "BybitTrades"  # Replace with your table name
 
+# Create the initial MySQL connection
+connection = mysql.connector.connect(
+    host=host,
+    user=user,
+    password=password,
+    database=database
+)
+cursor = connection.cursor()
+
 # Function to create or replace the table schema
 def create_table(cursor):
     # Define the SQL statement to drop the existing table if it exists
@@ -71,15 +80,6 @@ if response.status_code == 200:
     # Use regular expressions to extract links to contracts
     contract_links = re.findall(r'<a href="([^"]+/)">.*?</a>', page_content)
 
-    # Create a single MySQL connection for all CSVs
-    connection = mysql.connector.connect(
-        host=host,
-        user=user,
-        password=password,
-        database=database
-    )
-    cursor = connection.cursor()
-
     for contract_link in contract_links:
         contract_url = base_url + contract_link
 
@@ -115,12 +115,21 @@ if response.status_code == 200:
                         df = pd.read_csv(extracted_file_path)
                         data = [tuple(row) for row in df.values]
 
-                        # Insert the CSV data into the database
-                        batch_size = 200000
-                        for i in range(0, len(data), batch_size):
-                            insert_rows(data[i:i + batch_size], cursor, connection)
-                        
-                        os.remove(extracted_file_path)  # Delete the downloaded and extracted CSV file
+                        try:
+                            # Insert the CSV data into the database
+                            batch_size = 200000
+                            for i in range(0, len(data), batch_size):
+                                insert_rows(data[i:i + batch_size], cursor, connection)
+                            os.remove(extracted_file_path)  # Delete the downloaded and extracted CSV file
+                        except Error as e:
+                            print(f"Error inserting data: {e}")
+                            # Reconnect to the MySQL server and retry the insert
+                            connection.reconnect()
+                            cursor = connection.cursor()
+                            batch_size = 200000
+                            for i in range(0, len(data), batch_size):
+                                insert_rows(data[i:i + batch_size], cursor, connection)
+                            os.remove(extracted_file_path)  # Delete the downloaded and extracted CSV file
 
                     else:
                         print(f"Downloaded: {csv_file_path}")
