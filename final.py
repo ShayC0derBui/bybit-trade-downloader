@@ -135,7 +135,7 @@ if response.status_code == 200:
 
                         for index, row in df.iterrows():
                             # Calculate the time difference from the base timestamp
-                            time_difference = row['timestamp'] - base_timestamp
+                            time_difference = abs(row['timestamp'] - base_timestamp)
                             volume += df['foreignNotional'].iloc[index]
 
                             # Update low and high prices for the current hour
