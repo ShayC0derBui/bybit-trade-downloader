@@ -77,6 +77,8 @@ if os.path.exists("temp"):
 # Create a "temp" directory
 os.makedirs("temp")
 
+create_table(cursor)
+
 # Get the page content and parse it to extract links to contracts
 response = requests.get(base_url)
 if response.status_code == 200:
