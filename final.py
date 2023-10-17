@@ -40,7 +40,12 @@ def create_table(cursor):
         trdMatchID VARCHAR(255),
         grossValue DOUBLE,
         homeNotional DOUBLE,
-        foreignNotional DOUBLE
+        foreignNotional DOUBLE,
+        openTime DOUBLE,
+        closeTime DOUBLE,
+        low DOUBLE,
+        high DOUBLE,
+        volume DOUBLE
     )
     """.format(table_name)
 
@@ -52,7 +57,7 @@ def create_table(cursor):
 
 # Function to insert rows into the MySQL database and log
 def insert_rows(data, cursor, connection):
-    insert_query = "INSERT INTO {} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)".format(table_name)
+    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, low, high, volume) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
     try:
         cursor.executemany(insert_query, data)
@@ -77,8 +82,9 @@ response = requests.get(base_url)
 if response.status_code == 200:
     page_content = response.text
 
-    # Use regular expressions to extract links to contracts
-    contract_links = re.findall(r'<a href="([^"]+/)">.*?</a>', page_content)
+    # Use regular expressions to extract links to contracts starting with BTC or ETH
+    contract_links = re.findall(r'<a href="((?:BTC|ETH)[^"]+)">', page_content)
+
 
     for contract_link in contract_links:
         contract_url = base_url + contract_link
@@ -111,25 +117,51 @@ if response.status_code == 200:
                         print(f"Downloaded and extracted: {extracted_file_path}")
                         os.remove(csv_file_path)  # Delete the downloaded CSV file
 
-                        # Insert the extracted data into the database
+                        # Read the extracted CSV file
                         df = pd.read_csv(extracted_file_path)
-                        data = [tuple(row) for row in df.values]
 
-                        try:
-                            # Insert the CSV data into the database
-                            batch_size = 200000
-                            for i in range(0, len(data), batch_size):
-                                insert_rows(data[i:i + batch_size], cursor, connection)
-                            os.remove(extracted_file_path)  # Delete the downloaded and extracted CSV file
-                        except Error as e:
-                            print(f"Error inserting data: {e}")
-                            # Reconnect to the MySQL server and retry the insert
-                            connection.reconnect()
-                            cursor = connection.cursor()
-                            batch_size = 200000
-                            for i in range(0, len(data), batch_size):
-                                insert_rows(data[i:i + batch_size], cursor, connection)
-                            os.remove(extracted_file_path)  # Delete the downloaded and extracted CSV file
+                        # Initialize variables for the first row of each hourly interval
+                        base_timestamp = df['timestamp'].iloc[0]
+                        open_time = base_timestamp
+                        low_price = high_price = df['price'].iloc[0]
+                        volume = 0
+                        hourly_data = []
+
+                        # Helper function to create a row list with all the elements
+                        def create_hourly_row(row, open_time, close_time, low_price, high_price, volume):
+                            return [row['timestamp'], row['symbol'], row['side'], row['size'], row['price'], row['tickDirection'], row['trdMatchID'], row['grossValue'], row['homeNotional'], row['foreignNotional'], open_time, close_time, low_price, high_price, volume]
+
+                        for index, row in df.iterrows():
+                            # Calculate the time difference from the base timestamp
+                            time_difference = row['timestamp'] - base_timestamp
+                            volume += df['foreignNotional'].iloc[index]
+
+                            # Update low and high prices for the current hour
+                            if row['price'] < low_price:
+                                low_price = row['price']
+                            if row['price'] > high_price:
+                                high_price = row['price']
+
+                            if time_difference >= 3600:
+                                # Calculate closeTime using the current row's timestamp
+                                close_time = row['timestamp']
+                                volume += row['foreignNotional']
+
+                                # Append the hourly data to the list as a single list
+                                hourly_data.append(create_hourly_row(row, open_time, close_time, low_price, high_price, volume))
+
+                                # Update the base timestamp to the current row's timestamp and reset openTime, low, high, and volume
+                                base_timestamp = row['timestamp']
+                                open_time = base_timestamp
+                                low_price = high_price = row['price']
+                                volume = 0
+
+                        # Insert the hourly data into the database
+                        data = [tuple(row) for row in hourly_data]
+                        insert_rows(data, cursor, connection)
+
+                        # Delete the extracted CSV file
+                        os.remove(extracted_file_path)
 
                     else:
                         print(f"Downloaded: {csv_file_path}")
