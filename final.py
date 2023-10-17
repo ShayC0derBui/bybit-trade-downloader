@@ -34,7 +34,7 @@ def create_table(cursor):
         timestamp DOUBLE,
         symbol VARCHAR(255),
         side VARCHAR(255),
-        size INT,
+        size DOUBLE,
         price DOUBLE,
         tickDirection VARCHAR(255),
         trdMatchID VARCHAR(255),
@@ -43,9 +43,9 @@ def create_table(cursor):
         foreignNotional DOUBLE,
         openTime DOUBLE,
         closeTime DOUBLE,
-        low DOUBLE,
-        high DOUBLE,
-        volume DOUBLE
+        lowPrice DOUBLE,
+        highPrice DOUBLE,
+        volumeQuote DOUBLE
     )
     """.format(table_name)
 
@@ -57,7 +57,7 @@ def create_table(cursor):
 
 # Function to insert rows into the MySQL database and log
 def insert_rows(data, cursor, connection):
-    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, low, high, volume) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, lowPrice, highPrice, volumeQuote) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
     try:
         cursor.executemany(insert_query, data)
