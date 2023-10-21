@@ -123,15 +123,25 @@ if response.status_code == 200:
                         df = pd.read_csv(extracted_file_path)
 
                         # Initialize variables for the first row of each hourly interval
-                        base_timestamp = df['timestamp'].iloc[0]
-                        open_time = base_timestamp
-                        low_price = high_price = df['price'].iloc[0]
+                        base_timestamp = float(df['timestamp'].iloc[0])
+                        open_time = float(base_timestamp)
+                        low_price = float(high_price = df['price'].iloc[0])
                         volume = 0
                         hourly_data = []
 
-                        # Helper function to create a row list with all the elements
                         def create_hourly_row(row, open_time, close_time, low_price, high_price, volume):
-                            return [row['timestamp'], row['symbol'], row['side'], row['size'], row['price'], row['tickDirection'], row['trdMatchID'], row['grossValue'], row['homeNotional'], row['foreignNotional'], open_time, close_time, low_price, high_price, volume]
+                            timestamp = float(row['timestamp'])  # Cast timestamp to float
+                            symbol = str(row['symbol'])  # Cast symbol to string
+                            side = str(row['side'])  # Cast side to string
+                            size = int(row['size'])  # Cast size to int
+                            price = float(row['price'])  # Cast price to float
+                            tickDirection = str(row['tickDirection'])  # Cast tickDirection to string
+                            trdMatchID = str(row['trdMatchID'])  # Cast trdMatchID to string
+                            grossValue = float(row['grossValue'])  # Cast grossValue to float
+                            homeNotional = float(row['homeNotional'])  # Cast homeNotional to float
+                            foreignNotional = float(row['foreignNotional'])  # Cast foreignNotional to float
+
+                            return [timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, open_time, close_time, low_price, high_price, volume]
 
                         for index, row in df.iterrows():
                             # Calculate the time difference from the base timestamp
