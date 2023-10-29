@@ -1,22 +1,23 @@
 import os
 import pandas as pd
-import mysql.connector
-from mysql.connector import Error
+import psycopg2.extras
 import requests
 import gzip
 import re
 import shutil
 
-# Define your MySQL connection parameters
-host = "tonnochycapital.com"
-user = "prem"
-password = "jr5NkkkjKK&M@f5HtgL&5HYN9bSt!fd@Vz9*#cg@3Hmdt#sfhyRGyTQ2C%xV73zp"
-database = "exchanges_data"
+# Define your PostgreSQL connection parameters
+host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
+port = "5432"  # Replace with your PostgreSQL server's port
+user = "prem"  # Replace with your PostgreSQL username
+password = "pass12345"  # Replace with your PostgreSQL password
+database = "exchanges_data"  # Replace with your PostgreSQL database name
 table_name = "BybitTrades"  # Replace with your table name
 
-# Create the initial MySQL connection
-connection = mysql.connector.connect(
+# Create the initial PostgreSQL connection
+connection = psycopg2.connect(
     host=host,
+    port=port,
     user=user,
     password=password,
     database=database
@@ -26,44 +27,45 @@ cursor = connection.cursor()
 # Function to create or replace the table schema
 def create_table(cursor):
     # Define the SQL statement to drop the existing table if it exists
-    drop_table_query = "DROP TABLE IF EXISTS {}".format(table_name)
+    drop_table_query = f"DROP TABLE IF EXISTS {table_name}"
 
     # Define the SQL statement to create the new table
-    create_table_query = """
-    CREATE TABLE {} (
-        timestamp DOUBLE,
+    create_table_query = f"""
+    CREATE TABLE {table_name} (
+        timestamp DOUBLE PRECISION,
         symbol VARCHAR(255),
         side VARCHAR(255),
-        size DOUBLE,
-        price DOUBLE,
+        size DOUBLE PRECISION,
+        price DOUBLE PRECISION,
         tickDirection VARCHAR(255),
         trdMatchID VARCHAR(255),
-        grossValue DOUBLE,
-        homeNotional DOUBLE,
-        foreignNotional DOUBLE,
-        openTime DOUBLE,
-        closeTime DOUBLE,
-        lowPrice DOUBLE,
-        highPrice DOUBLE,
-        volumeQuote DOUBLE
+        grossValue DOUBLE PRECISION,
+        homeNotional DOUBLE PRECISION,
+        foreignNotional DOUBLE PRECISION,
+        openTime DOUBLE PRECISION,
+        closeTime DOUBLE PRECISION,
+        lowPrice DOUBLE PRECISION,
+        highPrice DOUBLE PRECISION,
+        volumeQuote DOUBLE PRECISION
     )
-    """.format(table_name)
+    """
 
     try:
         cursor.execute(drop_table_query)
         cursor.execute(create_table_query)
-    except Error as e:
+        connection.commit()
+    except psycopg2.Error as e:
         print(f"Error creating or replacing the table: {e}")
 
-# Function to insert rows into the MySQL database and log
+# Function to insert rows into the PostgreSQL database and log
 def insert_rows(data, cursor, connection):
-    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, lowPrice, highPrice, volumeQuote) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, lowPrice, highPrice, volumeQuote) VALUES %s"
 
     try:
-        cursor.executemany(insert_query, data)
-        print(f"Inserted {len(data)} rows.")
+        psycopg2.extras.execute_values(cursor, insert_query, data)
         connection.commit()
-    except Error as e:
+        print(f"Inserted {len(data)} rows.")
+    except psycopg2.Error as e:
         connection.rollback()
         print(f"Error inserting data: {e}")
 
@@ -86,7 +88,6 @@ if response.status_code == 200:
 
     # Use regular expressions to extract links to contracts starting with BTC or ETH
     contract_links = re.findall(r'<a href="((?:BTC|ETH)[^"]+)">', page_content)
-
 
     for contract_link in contract_links:
         contract_url = base_url + contract_link
@@ -125,7 +126,8 @@ if response.status_code == 200:
                         # Initialize variables for the first row of each hourly interval
                         base_timestamp = float(df['timestamp'].iloc[0])
                         open_time = float(base_timestamp)
-                        low_price = float(high_price = df['price'].iloc[0])
+                        low_price = float(df['price'].iloc[0])
+                        high_price = low_price
                         volume = 0
                         hourly_data = []
 
@@ -133,7 +135,7 @@ if response.status_code == 200:
                             timestamp = float(row['timestamp'])  # Cast timestamp to float
                             symbol = str(row['symbol'])  # Cast symbol to string
                             side = str(row['side'])  # Cast side to string
-                            size = int(row['size'])  # Cast size to int
+                            size = float(row['size'])  # Cast size to float
                             price = float(row['price'])  # Cast price to float
                             tickDirection = str(row['tickDirection'])  # Cast tickDirection to string
                             trdMatchID = str(row['trdMatchID'])  # Cast trdMatchID to string
@@ -141,7 +143,7 @@ if response.status_code == 200:
                             homeNotional = float(row['homeNotional'])  # Cast homeNotional to float
                             foreignNotional = float(row['foreignNotional'])  # Cast foreignNotional to float
 
-                            return [timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, open_time, close_time, low_price, high_price, volume]
+                            return (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, open_time, close_time, low_price, high_price, volume)
 
                         for index, row in df.iterrows():
                             # Calculate the time difference from the base timestamp
@@ -159,7 +161,7 @@ if response.status_code == 200:
                                 close_time = row['timestamp']
                                 volume += row['foreignNotional']
 
-                                # Append the hourly data to the list as a single list
+                                # Append the hourly data to the list as a single tuple
                                 hourly_data.append(create_hourly_row(row, open_time, close_time, low_price, high_price, volume))
 
                                 # Update the base timestamp to the current row's timestamp and reset openTime, low, high, and volume
@@ -169,15 +171,12 @@ if response.status_code == 200:
                                 volume = 0
 
                         # Insert the hourly data into the database
-                        data = [tuple(row) for row in hourly_data]
-                        insert_rows(data, cursor, connection)
+                        insert_rows(hourly_data, cursor, connection)
 
                         # Delete the extracted CSV file
                         os.remove(extracted_file_path)
-
                     else:
                         print(f"Downloaded: {csv_file_path}")
-
                 else:
                     print(f"Failed to download: {csv_link}")
 
@@ -187,6 +186,5 @@ if response.status_code == 200:
 
     # Recursively delete the "temp" directory and its contents
     shutil.rmtree("temp")
-
 else:
     print("Failed to access the directory listing.")
