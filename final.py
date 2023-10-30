@@ -7,7 +7,7 @@ import re
 import shutil
 
 # Define your PostgreSQL connection parameters
-host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
+host = "tonnochycapital.store"  # Replace with your PostgreSQL server's hostname or IP address
 port = "5432"  # Replace with your PostgreSQL server's port
 user = "prem"  # Replace with your PostgreSQL username
 password = "pass12345"  # Replace with your PostgreSQL password
