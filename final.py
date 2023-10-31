@@ -5,12 +5,13 @@ import requests
 import gzip
 import re
 import shutil
+import time
 
 # Define your PostgreSQL connection parameters
-host = "tonnochycapital.store"  # Replace with your PostgreSQL server's hostname or IP address
+host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
 port = "5432"  # Replace with your PostgreSQL server's port
 user = "prem"  # Replace with your PostgreSQL username
-password = "pass12345"  # Replace with your PostgreSQL password
+password = "prem"  # Replace with your PostgreSQL password
 database = "exchanges_data"  # Replace with your PostgreSQL database name
 table_name = "BybitTrades"  # Replace with your table name
 
@@ -50,6 +51,7 @@ def create_table(cursor):
     )
     """
 
+
     try:
         cursor.execute(drop_table_query)
         cursor.execute(create_table_query)
@@ -82,18 +84,33 @@ os.makedirs("temp")
 create_table(cursor)
 
 # Get the page content and parse it to extract links to contracts
-response = requests.get(base_url)
+while True:
+    try:
+        response = requests.get(base_url)
+        break
+    except Exception as e:
+        print(f"Error: {e}")
+        print("Retrying in 10 seconds...")
+        time.sleep(10)  # Sleep for 10 seconds before retrying
+
 if response.status_code == 200:
     page_content = response.text
 
     # Use regular expressions to extract links to contracts starting with BTC or ETH
-    contract_links = re.findall(r'<a href="((?:BTC|ETH)[^"]+)">', page_content)
+    contract_links = re.findall(r'<a href="((?:BTC|ETH|DAI|BNB|XRP|SOL|ADA|DOGE)[^"]+)">', page_content)
 
     for contract_link in contract_links:
         contract_url = base_url + contract_link
 
         # Get the page content of the contract and parse it to extract links to CSV files
-        contract_response = requests.get(contract_url)
+        while True:
+            try:
+                contract_response = requests.get(contract_url)
+                break
+            except Exception as e:
+                print(f"Error: {e}")
+                print("Retrying in 10 seconds...")
+                time.sleep(10)  # Sleep for 10 seconds before retrying
         if contract_response.status_code == 200:
             contract_content = contract_response.text
 
@@ -106,7 +123,14 @@ if response.status_code == 200:
                 csv_file_path = os.path.join("temp", csv_file_name)
 
                 # Download the CSV file
-                response = requests.get(csv_url)
+                while True:
+                    try:
+                        response = requests.get(csv_url)
+                        break
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        print("Retrying in 10 seconds...")
+                        time.sleep(10)  # Sleep for 10 seconds before retrying
                 if response.status_code == 200:
                     with open(csv_file_path, 'wb') as csv_file:
                         csv_file.write(response.content)
