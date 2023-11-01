@@ -81,7 +81,7 @@ if os.path.exists("temp"):
 # Create a "temp" directory
 os.makedirs("temp")
 
-create_table(cursor)
+# create_table(cursor)
 
 # Get the page content and parse it to extract links to contracts
 while True:
@@ -96,8 +96,9 @@ while True:
 if response.status_code == 200:
     page_content = response.text
 
-    # Use regular expressions to extract links to contracts starting with BTC or ETH
-    contract_links = re.findall(r'<a href="((?:BTC|ETH|DAI|BNB|XRP|SOL|ADA|DOGE)[^"]+)">', page_content)
+    # Use regular expressions to extract links to contracts starting with BTC, ETH, or other symbols
+    contract_links = re.findall(r'<a href="((?:ETH|DAI|XRP|SOL|DOGE|BTCUSDH23|BTCUSDH24|BTCUSDM22|BTCUSDM23|BTCUSDT|BTCUSDU21|BTCUSDU22|BTCUSDU23|BTCUSDZ21|BTCUSDZ22|BTCUSDZ23)[^"]+)">', page_content)
+
 
     for contract_link in contract_links:
         contract_url = base_url + contract_link
@@ -145,7 +146,12 @@ if response.status_code == 200:
                         os.remove(csv_file_path)  # Delete the downloaded CSV file
 
                         # Read the extracted CSV file
-                        df = pd.read_csv(extracted_file_path)
+                        try:
+                            df = pd.read_csv(extracted_file_path)
+                        except Exception as e:
+                            print(f"Error reading CSV file: {e}")
+                            print(f"Skipping file: {extracted_file_path}")
+                            continue
 
                         # Initialize variables for the first row of each hourly interval
                         base_timestamp = float(df['timestamp'].iloc[0])
