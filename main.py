@@ -6,6 +6,7 @@ import gzip
 import re
 import shutil
 import time
+from datetime import datetime, timedelta
 
 # Define your PostgreSQL connection parameters
 host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
@@ -37,7 +38,6 @@ def create_table(cursor):
         symbol VARCHAR(255),
         side VARCHAR(255),
         size DOUBLE PRECISION,
-        price DOUBLE PRECISION,
         tickDirection VARCHAR(255),
         trdMatchID VARCHAR(255),
         grossValue DOUBLE PRECISION,
@@ -47,11 +47,11 @@ def create_table(cursor):
         closeTime DOUBLE PRECISION,
         lowPrice DOUBLE PRECISION,
         highPrice DOUBLE PRECISION,
+        openPrice DOUBLE PRECISION,
+        closePrice DOUBLE PRECISION,
         volumeQuote DOUBLE PRECISION
     )
     """
-
-
     try:
         cursor.execute(drop_table_query)
         cursor.execute(create_table_query)
@@ -61,7 +61,7 @@ def create_table(cursor):
 
 # Function to insert rows into the PostgreSQL database and log
 def insert_rows(data, cursor, connection):
-    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, lowPrice, highPrice, volumeQuote) VALUES %s"
+    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, lowPrice, highPrice, openPrice, closePrice, volumeQuote) VALUES %s"
 
     try:
         psycopg2.extras.execute_values(cursor, insert_query, data)
@@ -81,7 +81,7 @@ if os.path.exists("temp"):
 # Create a "temp" directory
 os.makedirs("temp")
 
-# create_table(cursor)
+create_table(cursor)
 
 # Get the page content and parse it to extract links to contracts
 while True:
@@ -97,7 +97,7 @@ if response.status_code == 200:
     page_content = response.text
 
     # Use regular expressions to extract links to contracts starting with BTC, ETH, or other symbols
-    contract_links = re.findall(r'<a href="((?:ETH|DAI|XRP|SOL|DOGE|BTCUSDH23|BTCUSDH24|BTCUSDM22|BTCUSDM23|BTCUSDT|BTCUSDU21|BTCUSDU22|BTCUSDU23|BTCUSDZ21|BTCUSDZ22|BTCUSDZ23)[^"]+)">', page_content)
+    contract_links = re.findall(r'<a href="((?:ADA|BTC|ETH|DAI|XRP|SOL|DOGE)[^"]+)">', page_content)
 
 
     for contract_link in contract_links:
@@ -117,6 +117,19 @@ if response.status_code == 200:
 
             # Use regular expressions to extract filenames
             csv_links = re.findall(r'<a href="([^"]+)">.*?</a>', contract_content)
+
+            # Set your desired start_time
+            start_time = None
+
+            # Initialize variables
+            this_is_start_row = True
+            open_time = None
+            open_price = 0
+            low_price = float('inf')
+            high_price = 0
+            volume = 0
+            hourly_data = []
+            is_it_the_first_time  = True
 
             for csv_link in csv_links:
                 csv_url = contract_url + csv_link
@@ -153,55 +166,62 @@ if response.status_code == 200:
                             print(f"Skipping file: {extracted_file_path}")
                             continue
 
-                        # Initialize variables for the first row of each hourly interval
-                        base_timestamp = float(df['timestamp'].iloc[0])
-                        open_time = float(base_timestamp)
-                        low_price = float(df['price'].iloc[0])
-                        high_price = low_price
-                        volume = 0
-                        hourly_data = []
-
-                        def create_hourly_row(row, open_time, close_time, low_price, high_price, volume):
+                        def create_hourly_row(row, open_time, close_time, low_price, high_price,open_price, close_price, volume):
                             timestamp = float(row['timestamp'])  # Cast timestamp to float
                             symbol = str(row['symbol'])  # Cast symbol to string
                             side = str(row['side'])  # Cast side to string
                             size = float(row['size'])  # Cast size to float
-                            price = float(row['price'])  # Cast price to float
                             tickDirection = str(row['tickDirection'])  # Cast tickDirection to string
                             trdMatchID = str(row['trdMatchID'])  # Cast trdMatchID to string
                             grossValue = float(row['grossValue'])  # Cast grossValue to float
                             homeNotional = float(row['homeNotional'])  # Cast homeNotional to float
                             foreignNotional = float(row['foreignNotional'])  # Cast foreignNotional to float
 
-                            return (timestamp, symbol, side, size, price, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, open_time, close_time, low_price, high_price, volume)
+                            return (timestamp, symbol, side, size, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, open_time, close_time, low_price, high_price, open_price, close_price, volume)
 
+                        
+                        if is_it_the_first_time:
+                            cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
+                            
+                            # Find the closest next hour to cur_time and set it as start time
+                            start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second)
+
+                            is_it_the_first_time = False
                         for index, row in df.iterrows():
-                            # Calculate the time difference from the base timestamp
-                            time_difference = abs(row['timestamp'] - base_timestamp)
-                            volume += df['foreignNotional'].iloc[index]
+                            trade_time = datetime.fromtimestamp(row['timestamp'])
+                            # Check if we haven't reached start_time, continue to the next loop iteration
+                            if trade_time < start_time:
+                                continue
+                            else:
+                                if this_is_start_row:
+                                    this_is_start_row = False
+                                    open_time = start_time
+                                    open_price = row['price']
+                                    volume += row['foreignNotional']
+                                    low_price = min(low_price, row['price'])
+                                    high_price = max(high_price, row['price'])
+                                else:
+                                    if trade_time < start_time + timedelta(hours=1):
+                                        volume += row['foreignNotional']
+                                        low_price = min(low_price, row['price'])
+                                        high_price = max(high_price, row['price'])
+                                    else:
+                                        close_price = df['price'].iloc[index - 1]
+                                        close_time = start_time + timedelta(hours=1)
+                                        hourly_data.append(create_hourly_row(row, datetime.timestamp(open_time), datetime.timestamp(close_time),low_price, high_price, open_price, close_price, volume))
 
-                            # Update low and high prices for the current hour
-                            if row['price'] < low_price:
-                                low_price = row['price']
-                            if row['price'] > high_price:
-                                high_price = row['price']
-
-                            if time_difference >= 3600:
-                                # Calculate closeTime using the current row's timestamp
-                                close_time = row['timestamp']
-                                volume += row['foreignNotional']
-
-                                # Append the hourly data to the list as a single tuple
-                                hourly_data.append(create_hourly_row(row, open_time, close_time, low_price, high_price, volume))
-
-                                # Update the base timestamp to the current row's timestamp and reset openTime, low, high, and volume
-                                base_timestamp = row['timestamp']
-                                open_time = base_timestamp
-                                low_price = high_price = row['price']
-                                volume = 0
+                                        # Reset variables for the next hour
+                                        start_time = close_time
+                                        this_is_start_row = True
+                                        open_time = start_time
+                                        open_price = row['price']
+                                        low_price = float('inf')
+                                        high_price = 0
+                                        volume = row['foreignNotional']
 
                         # Insert the hourly data into the database
                         insert_rows(hourly_data, cursor, connection)
+                        hourly_data = []
 
                         # Delete the extracted CSV file
                         os.remove(extracted_file_path)
