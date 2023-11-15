@@ -34,6 +34,7 @@ def create_table(cursor):
     # Define the SQL statement to create the new table
     create_table_query = f"""
     CREATE TABLE {table_name} (
+        id SERIAL PRIMARY KEY,
         timestamp BIGINT,
         symbol VARCHAR(255),
         side VARCHAR(255),
