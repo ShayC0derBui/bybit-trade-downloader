@@ -34,12 +34,12 @@ def create_table(cursor):
     # Define the SQL statement to create the new table
     create_table_query = f"""
     CREATE TABLE {table_name} (
-        timestamp DOUBLE PRECISION,
+        timestamp BIGINT,
         symbol VARCHAR(255),
         side VARCHAR(255),
         sizeQuote DOUBLE PRECISION,
-        openTime DOUBLE PRECISION,
-        closeTime DOUBLE PRECISION,
+        openTime BIGINT,
+        closeTime BIGINT,
         lowPrice DOUBLE PRECISION,
         highPrice DOUBLE PRECISION,
         openPrice DOUBLE PRECISION,
@@ -48,6 +48,7 @@ def create_table(cursor):
         exchange VARCHAR(255)
     )
     """
+
     try:
         cursor.execute(drop_table_query)
         cursor.execute(create_table_query)
