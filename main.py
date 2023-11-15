@@ -31,10 +31,12 @@ def create_table(cursor):
     # Define the SQL statement to drop the existing table if it exists
     drop_table_query = f"DROP TABLE IF EXISTS {table_name}"
 
+    extension_query = "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""
+
     # Define the SQL statement to create the new table
     create_table_query = f"""
     CREATE TABLE {table_name} (
-        id SERIAL PRIMARY KEY,
+        id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
         timestamp BIGINT,
         symbol VARCHAR(255),
         side VARCHAR(255),
@@ -50,8 +52,10 @@ def create_table(cursor):
     )
     """
 
+
     try:
         cursor.execute(drop_table_query)
+        cursor.execute(extension_query)
         cursor.execute(create_table_query)
         connection.commit()
     except psycopg2.Error as e:
