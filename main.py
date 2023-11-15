@@ -44,7 +44,8 @@ def create_table(cursor):
         highPrice DOUBLE PRECISION,
         openPrice DOUBLE PRECISION,
         closePrice DOUBLE PRECISION,
-        volumeQuote DOUBLE PRECISION
+        volumeQuote DOUBLE PRECISION,
+        exchange VARCHAR(255)
     )
     """
     try:
@@ -58,7 +59,7 @@ create_table(cursor)
 
 # Function to insert rows into the PostgreSQL database and log
 def insert_rows(data, cursor, connection):
-    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, sizeQuote, openTime, closeTime, lowPrice, highPrice, openPrice, closePrice, volumeQuote) VALUES %s"
+    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, sizeQuote, openTime, closeTime, lowPrice, highPrice, openPrice, closePrice, volumeQuote, exchange) VALUES %s"
 
     try:
         psycopg2.extras.execute_values(cursor, insert_query, data)
@@ -167,8 +168,9 @@ if response.status_code == 200:
                             symbol = str(row['symbol'])  # Cast symbol to string
                             side = str(row['side'])  # Cast side to string
                             size = float(row['size'])  # Cast size to float
+                            exchange = "bybit"
 
-                            return (timestamp, symbol, side, size, open_time, close_time, low_price, high_price, open_price, close_price, volume)
+                            return (timestamp, symbol, side, size, open_time, close_time, low_price, high_price, open_price, close_price, volume, exchange)
 
                         
                         if is_it_the_first_time:
