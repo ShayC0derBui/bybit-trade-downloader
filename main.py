@@ -14,7 +14,7 @@ port = "5432"  # Replace with your PostgreSQL server's port
 user = "prem"  # Replace with your PostgreSQL username
 password = "prem"  # Replace with your PostgreSQL password
 database = "exchanges_data"  # Replace with your PostgreSQL database name
-table_name = "BybitTrades"  # Replace with your table name
+table_name = "Trades"  # Replace with your table name
 
 # Create the initial PostgreSQL connection
 connection = psycopg2.connect(
