@@ -165,10 +165,10 @@ if response.status_code == 200:
 
                         def create_hourly_row(row, open_time, close_time, low_price, high_price, open_price, close_price, volume):
                             timestamp = float(row['timestamp'])  # Cast timestamp to float
-                            symbol = str(row['symbol'])  # Cast symbol to string
-                            side = str(row['side'])  # Cast side to string
+                            symbol = str(row['symbol']).upper()  # Cast symbol to string
+                            side = str(row['side']).upper()  # Cast side to string
                             size = float(row['size'])  # Cast size to float
-                            exchange = "bybit"
+                            exchange = "BYBIT"
 
                             return (timestamp, symbol, side, size, open_time, close_time, low_price, high_price, open_price, close_price, volume, exchange)
 
