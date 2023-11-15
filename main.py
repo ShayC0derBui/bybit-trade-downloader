@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 # Define your PostgreSQL connection parameters
 host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
 port = "5432"  # Replace with your PostgreSQL server's port
-user = "premkumarsinha"  # Replace with your PostgreSQL username
-password = "premks8057"  # Replace with your PostgreSQL password
+user = "prem"  # Replace with your PostgreSQL username
+password = "prem"  # Replace with your PostgreSQL password
 database = "exchanges_data"  # Replace with your PostgreSQL database name
 table_name = "BybitTrades"  # Replace with your table name
 
