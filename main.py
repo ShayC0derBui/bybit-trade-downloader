@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 # Define your PostgreSQL connection parameters
 host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
 port = "5432"  # Replace with your PostgreSQL server's port
-user = "prem"  # Replace with your PostgreSQL username
-password = "prem"  # Replace with your PostgreSQL password
+user = "premkumarsinha"  # Replace with your PostgreSQL username
+password = "premks8057"  # Replace with your PostgreSQL password
 database = "exchanges_data"  # Replace with your PostgreSQL database name
 table_name = "BybitTrades"  # Replace with your table name
 
@@ -37,12 +37,7 @@ def create_table(cursor):
         timestamp DOUBLE PRECISION,
         symbol VARCHAR(255),
         side VARCHAR(255),
-        size DOUBLE PRECISION,
-        tickDirection VARCHAR(255),
-        trdMatchID VARCHAR(255),
-        grossValue DOUBLE PRECISION,
-        homeNotional DOUBLE PRECISION,
-        foreignNotional DOUBLE PRECISION,
+        sizeQuote DOUBLE PRECISION,
         openTime DOUBLE PRECISION,
         closeTime DOUBLE PRECISION,
         lowPrice DOUBLE PRECISION,
@@ -59,9 +54,11 @@ def create_table(cursor):
     except psycopg2.Error as e:
         print(f"Error creating or replacing the table: {e}")
 
+create_table(cursor)
+
 # Function to insert rows into the PostgreSQL database and log
 def insert_rows(data, cursor, connection):
-    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, size, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, openTime, closeTime, lowPrice, highPrice, openPrice, closePrice, volumeQuote) VALUES %s"
+    insert_query = f"INSERT INTO {table_name} (timestamp, symbol, side, sizeQuote, openTime, closeTime, lowPrice, highPrice, openPrice, closePrice, volumeQuote) VALUES %s"
 
     try:
         psycopg2.extras.execute_values(cursor, insert_query, data)
@@ -81,7 +78,6 @@ if os.path.exists("temp"):
 # Create a "temp" directory
 os.makedirs("temp")
 
-create_table(cursor)
 
 # Get the page content and parse it to extract links to contracts
 while True:
@@ -166,18 +162,13 @@ if response.status_code == 200:
                             print(f"Skipping file: {extracted_file_path}")
                             continue
 
-                        def create_hourly_row(row, open_time, close_time, low_price, high_price,open_price, close_price, volume):
+                        def create_hourly_row(row, open_time, close_time, low_price, high_price, open_price, close_price, volume):
                             timestamp = float(row['timestamp'])  # Cast timestamp to float
                             symbol = str(row['symbol'])  # Cast symbol to string
                             side = str(row['side'])  # Cast side to string
                             size = float(row['size'])  # Cast size to float
-                            tickDirection = str(row['tickDirection'])  # Cast tickDirection to string
-                            trdMatchID = str(row['trdMatchID'])  # Cast trdMatchID to string
-                            grossValue = float(row['grossValue'])  # Cast grossValue to float
-                            homeNotional = float(row['homeNotional'])  # Cast homeNotional to float
-                            foreignNotional = float(row['foreignNotional'])  # Cast foreignNotional to float
 
-                            return (timestamp, symbol, side, size, tickDirection, trdMatchID, grossValue, homeNotional, foreignNotional, open_time, close_time, low_price, high_price, open_price, close_price, volume)
+                            return (timestamp, symbol, side, size, open_time, close_time, low_price, high_price, open_price, close_price, volume)
 
                         
                         if is_it_the_first_time:
@@ -197,18 +188,18 @@ if response.status_code == 200:
                                     this_is_start_row = False
                                     open_time = start_time
                                     open_price = row['price']
-                                    volume += row['foreignNotional']
+                                    volume += row['homeNotional']
                                     low_price = min(low_price, row['price'])
                                     high_price = max(high_price, row['price'])
                                 else:
                                     if trade_time < start_time + timedelta(hours=1):
-                                        volume += row['foreignNotional']
+                                        volume += row['homeNotional']
                                         low_price = min(low_price, row['price'])
                                         high_price = max(high_price, row['price'])
                                     else:
-                                        close_price = df['price'].iloc[index - 1]
+                                        close_price = df['price'].iloc[index-1]
                                         close_time = start_time + timedelta(hours=1)
-                                        hourly_data.append(create_hourly_row(row, datetime.timestamp(open_time), datetime.timestamp(close_time),low_price, high_price, open_price, close_price, volume))
+                                        hourly_data.append(create_hourly_row(df.iloc[index-1], datetime.timestamp(open_time), datetime.timestamp(close_time),low_price, high_price, open_price, close_price, volume))
 
                                         # Reset variables for the next hour
                                         start_time = close_time
@@ -217,7 +208,7 @@ if response.status_code == 200:
                                         open_price = row['price']
                                         low_price = float('inf')
                                         high_price = 0
-                                        volume = row['foreignNotional']
+                                        volume = row['homeNotional']
 
                         # Insert the hourly data into the database
                         insert_rows(hourly_data, cursor, connection)
