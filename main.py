@@ -77,7 +77,7 @@ def insert_rows(data, cursor, connection):
         print(f"Error inserting data: {e}")
 
 # Replace this with the base URL of your directory listing
-url = {'base_url_spot': 'https://public.bybit.com/spot/', 'base_url_future': 'https://public.bybit.com/trading/'}
+url = {'base_url_spot':'https://public.bybit.com/spot/', 'base_url_future': 'https://public.bybit.com/trading/'}
 
 # Check if the "temp" directory exists and delete it if it does
 if os.path.exists("temp"):
@@ -141,7 +141,10 @@ for market,base_url in url.items():
                 is_it_the_first_time  = True
 
                 for csv_link in csv_links:
-                    csv_url = contract_url + csv_link
+                    if not future:
+                        csv_url = contract_url + '/' + csv_link
+                    else:
+                        csv_url = contract_url + csv_link
                     csv_file_name = os.path.basename(csv_link)
                     csv_file_path = os.path.join("temp", csv_file_name)
 
@@ -176,10 +179,19 @@ for market,base_url in url.items():
                                 continue
 
                             def create_hourly_row(row, open_time, close_time, low_price, high_price, open_price, close_price, volume):
-                                timestamp = float(row['timestamp'])  # Cast timestamp to float
-                                symbol = str(row['symbol']).upper()  # Cast symbol to string
+                                if not future:
+                                    timestamp = float(row['timestamp']/1000)
+                                else:
+                                    timestamp = float(row['timestamp'])  # Cast timestamp to float
+                                if not future:
+                                    symbol = str(contract_link)
+                                else:
+                                    symbol = str(row['symbol']).upper()  # Cast symbol to string
                                 side = str(row['side']).upper()  # Cast side to string
-                                size = float(row['size'])  # Cast size to float
+                                if not future:
+                                    size = float(row['volume'])
+                                else:
+                                    size = float(row['size'])  # Cast size to float
                                 exchange = "BYBIT"
                                 if not future:
                                     market = "SPOT"
@@ -193,14 +205,21 @@ for market,base_url in url.items():
 
                             
                             if is_it_the_first_time:
-                                cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
+                                if not future:
+                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0]/1000)
+                                else:
+                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
+                                    
                                 
                                 # Find the closest next hour to cur_time and set it as start time
                                 start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second)
 
                                 is_it_the_first_time = False
                             for index, row in df.iterrows():
-                                trade_time = datetime.fromtimestamp(row['timestamp'])
+                                if not future:
+                                    trade_time = datetime.fromtimestamp(row['timestamp']/1000)
+                                else:
+                                    trade_time = datetime.fromtimestamp(row['timestamp'])
                                 # Check if we haven't reached start_time, continue to the next loop iteration
                                 if trade_time < start_time:
                                     continue
@@ -209,12 +228,18 @@ for market,base_url in url.items():
                                         this_is_start_row = False
                                         open_time = start_time
                                         open_price = row['price']
-                                        volume += row['homeNotional']
+                                        if not future:
+                                            volume += row['volume']
+                                        else:
+                                            volume += row['homeNotional']
                                         low_price = min(low_price, row['price'])
                                         high_price = max(high_price, row['price'])
                                     else:
                                         if trade_time < start_time + timedelta(hours=1):
-                                            volume += row['homeNotional']
+                                            if not future:
+                                                volume += row['volume']
+                                            else:
+                                                volume += row['homeNotional']
                                             low_price = min(low_price, row['price'])
                                             high_price = max(high_price, row['price'])
                                         else:
@@ -229,7 +254,10 @@ for market,base_url in url.items():
                                             open_price = row['price']
                                             low_price = float('inf')
                                             high_price = 0
-                                            volume = row['homeNotional']
+                                            if not future:
+                                                volume += row['volume']
+                                            else:
+                                                volume += row['homeNotional']
 
                             # Insert the hourly data into the database
                             insert_rows(hourly_data, cursor, connection)
