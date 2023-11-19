@@ -212,7 +212,10 @@ for market,base_url in url.items():
                                     
                                 
                                 # Find the closest next hour to cur_time and set it as start time
-                                start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second)
+                                if not future:
+                                    start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second, microseconds=cur_time.microsecond)
+                                else:
+                                    start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second)
 
                                 is_it_the_first_time = False
                             for index, row in df.iterrows():
