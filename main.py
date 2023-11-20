@@ -273,11 +273,12 @@ for market,base_url in url.items():
                     else:
                         print(f"Failed to download: {csv_link}")
 
-        # Close the cursor and connection after all CSVs are processed
-        cursor.close()
-        connection.close()
-
-        # Recursively delete the "temp" directory and its contents
-        shutil.rmtree("temp")
     else:
         print("Failed to access the directory listing.")
+
+# Close the cursor and connection after all CSVs are processed
+cursor.close()
+connection.close()
+
+# Recursively delete the "temp" directory and its contents
+shutil.rmtree("temp")
