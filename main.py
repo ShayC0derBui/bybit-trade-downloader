@@ -62,7 +62,7 @@ def create_table(cursor):
     except psycopg2.Error as e:
         print(f"Error creating or replacing the table: {e}")
 
-create_table(cursor)
+# create_table(cursor)
 
 # Function to insert rows into the PostgreSQL database and log
 def insert_rows(data, cursor, connection):
@@ -77,7 +77,8 @@ def insert_rows(data, cursor, connection):
         print(f"Error inserting data: {e}")
 
 # Replace this with the base URL of your directory listing
-url = {'base_url_spot':'https://public.bybit.com/spot/', 'base_url_future': 'https://public.bybit.com/trading/'}
+# 'base_url_spot':'https://public.bybit.com/spot/',
+url = { 'base_url_future': 'https://public.bybit.com/trading/'}
 
 # Check if the "temp" directory exists and delete it if it does
 if os.path.exists("temp"):
