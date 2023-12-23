@@ -8,6 +8,13 @@ import shutil
 import time
 from datetime import datetime, timedelta
 
+time_frames = [
+    {"start": datetime.strptime("2021-11-18", "%Y-%m-%d"), "end": datetime.strptime("2021-11-25", "%Y-%m-%d")},
+    {"start": datetime.strptime("2021-12-06", "%Y-%m-%d"), "end": datetime.strptime("2021-12-13", "%Y-%m-%d")},
+    # Add more time frames as needed
+]
+
+
 # Define your PostgreSQL connection parameters
 host = "localhost"  # Replace with your PostgreSQL server's hostname or IP address
 port = "5432"  # Replace with your PostgreSQL server's port
@@ -125,11 +132,23 @@ for market,base_url in url.items():
             if contract_response.status_code == 200:
                 contract_content = contract_response.text
 
-                # Use regular expressions to extract filenames
+                # Use regular expressions to extract all filenames
                 csv_links = re.findall(r'<a href="([^"]+)">.*?</a>', contract_content)
 
-                # Set your desired start_time
-                start_time = None
+                # Filter csv_links based on the time frames
+                final_csv_links = []
+
+                for start_time_frame, end_time_frame in time_frames:
+                    for csv_link in csv_links:
+                        # Extract the time from the csv_link (you need to adapt this part based on your actual file naming structure)
+                        match = re.search(r'(\d{4}-\d{2}-\d{2})', csv_link)
+                        
+                        if match:
+                            csv_time = datetime.strptime(match.group(1), "%Y-%m-%d")
+                            
+                            # Check if csv_time is within the specified time frame
+                            if start_time_frame <= csv_time <= end_time_frame:
+                                final_csv_links.append(csv_link)
 
                 # Initialize variables
                 this_is_start_row = True
