@@ -9,8 +9,8 @@ import time
 from datetime import datetime, timedelta
 
 time_frames = [
-    {"start": datetime.strptime("2021-11-18", "%Y-%m-%d"), "end": datetime.strptime("2021-11-25", "%Y-%m-%d")},
-    {"start": datetime.strptime("2021-12-06", "%Y-%m-%d"), "end": datetime.strptime("2021-12-13", "%Y-%m-%d")},
+    {"start": datetime.strptime("2010-11-18", "%Y-%m-%d"), "end": datetime.strptime("2025-11-25", "%Y-%m-%d")},
+    # {"start": datetime.strptime("2021-12-06", "%Y-%m-%d"), "end": datetime.strptime("2021-12-13", "%Y-%m-%d")},
     # Add more time frames as needed
 ]
 
@@ -133,13 +133,14 @@ for market,base_url in url.items():
                 contract_content = contract_response.text
 
                 # Use regular expressions to extract all filenames
-                csv_links = re.findall(r'<a href="([^"]+)">.*?</a>', contract_content)
+                all_csv_links = re.findall(r'<a href="([^"]+)">.*?</a>', contract_content)
 
                 # Filter csv_links based on the time frames
-                final_csv_links = []
+                csv_links = []
 
-                for start_time_frame, end_time_frame in time_frames:
-                    for csv_link in csv_links:
+                for time_frame in time_frames:
+                    start_time_frame, end_time_frame = time_frame["start"], time_frame["end"]
+                    for csv_link in all_csv_links:
                         # Extract the time from the csv_link (you need to adapt this part based on your actual file naming structure)
                         match = re.search(r'(\d{4}-\d{2}-\d{2})', csv_link)
                         
@@ -148,7 +149,7 @@ for market,base_url in url.items():
                             
                             # Check if csv_time is within the specified time frame
                             if start_time_frame <= csv_time <= end_time_frame:
-                                final_csv_links.append(csv_link)
+                                csv_links.append(csv_link)
 
                 # Initialize variables
                 this_is_start_row = True
@@ -200,19 +201,20 @@ for market,base_url in url.items():
 
                             def create_hourly_row(row, open_time, close_time, low_price, high_price, open_price, close_price, volume):
                                 if not future:
-                                    timestamp = float(row['timestamp']/1000)
+                                    timestamp = float(row['timestamp'])
                                 else:
                                     timestamp = float(row['timestamp'])  # Cast timestamp to float
+
+                                side = str(row['side']).upper()  # Cast side to string
+
+                                exchange = "BYBIT"
+
                                 if not future:
                                     symbol = str(contract_link)
                                 else:
                                     symbol = str(row['symbol']).upper()  # Cast symbol to string
-                                side = str(row['side']).upper()  # Cast side to string
-                                if not future:
-                                    size = float(row['volume'])
-                                else:
-                                    size = float(row['size'])  # Cast size to float
-                                exchange = "BYBIT"
+
+
                                 if not future:
                                     market = "SPOT"
                                 else:
@@ -221,12 +223,21 @@ for market,base_url in url.items():
                                     elif symbol.endswith("USD") or re.match(r"[A-Za-z][A-Za-z][A-Za-z]USD[A-Za-z]\d\d", symbol):
                                         market = "INVERSE"
 
+                                if not future:
+                                    size = float(row['volume'])*float(row['price'])
+                                else:
+                                    if market=="LINEAR":
+                                        size = float(row['size'])*float(row['price'])
+                                    elif market=="INVERSE":
+                                        size = float(row['size'])
+                                    size = float(row['size'])*float(row['price'])  # Cast size to float
+
                                 return (timestamp, symbol, side, size, open_time, close_time, low_price, high_price, open_price, close_price, volume, market, exchange)
 
                             
                             if is_it_the_first_time:
                                 if not future:
-                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0]/1000)
+                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
                                 else:
                                     cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
                                     
@@ -239,8 +250,23 @@ for market,base_url in url.items():
 
                                 is_it_the_first_time = False
                             for index, row in df.iterrows():
+
                                 if not future:
-                                    trade_time = datetime.fromtimestamp(row['timestamp']/1000)
+                                    symbol = str(contract_link)
+                                else:
+                                    symbol = str(row['symbol']).upper()  # Cast symbol to string
+
+
+                                if not future:
+                                    market = "SPOT"
+                                else:
+                                    if symbol.endswith("USDT") or symbol.endswith("PERP") or "-" in symbol:
+                                        market = "LINEAR"
+                                    elif symbol.endswith("USD") or re.match(r"[A-Za-z][A-Za-z][A-Za-z]USD[A-Za-z]\d\d", symbol):
+                                        market = "INVERSE"
+
+                                if not future:
+                                    trade_time = datetime.fromtimestamp(row['timestamp'])
                                 else:
                                     trade_time = datetime.fromtimestamp(row['timestamp'])
                                 # Check if we haven't reached start_time, continue to the next loop iteration
@@ -252,17 +278,23 @@ for market,base_url in url.items():
                                         open_time = start_time
                                         open_price = row['price']
                                         if not future:
-                                            volume += row['volume']
+                                            volume += float(row['volume'])*float(row['price'])
                                         else:
-                                            volume += row['homeNotional']
+                                                if market=="LINEAR":
+                                                    volume += row['foreignNotional']
+                                                elif market=="INVERSE":
+                                                    volume += row['homeNotional']
                                         low_price = min(low_price, row['price'])
                                         high_price = max(high_price, row['price'])
                                     else:
                                         if trade_time < start_time + timedelta(hours=1):
                                             if not future:
-                                                volume += row['volume']
+                                                volume +=  float(row['volume'])*float(row['price'])
                                             else:
-                                                volume += row['homeNotional']
+                                                if market=="LINEAR":
+                                                    volume += row['foreignNotional']
+                                                elif market=="INVERSE":
+                                                    volume += row['homeNotional']
                                             low_price = min(low_price, row['price'])
                                             high_price = max(high_price, row['price'])
                                         else:
