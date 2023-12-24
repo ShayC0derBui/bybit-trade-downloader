@@ -85,7 +85,7 @@ def insert_rows(data, cursor, connection):
 
 # Replace this with the base URL of your directory listing
 # 'base_url_spot':'https://public.bybit.com/spot/', 'base_url_future': 'https://public.bybit.com/trading/',
-url = { 'base_url_spot':'https://public.bybit.com/spot/'}
+url = {'base_url_future': 'https://public.bybit.com/trading/'}
 
 # Check if the "temp" directory exists and delete it if it does
 if os.path.exists("temp"):
