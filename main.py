@@ -237,7 +237,7 @@ for market,base_url in url.items():
                             
                             if is_it_the_first_time:
                                 if not future:
-                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
+                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0]/1000)
                                 else:
                                     cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
                                     
@@ -266,7 +266,7 @@ for market,base_url in url.items():
                                         market = "INVERSE"
 
                                 if not future:
-                                    trade_time = datetime.fromtimestamp(row['timestamp'])
+                                    trade_time = datetime.fromtimestamp(row['timestamp']/1000)
                                 else:
                                     trade_time = datetime.fromtimestamp(row['timestamp'])
                                 # Check if we haven't reached start_time, continue to the next loop iteration
