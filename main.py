@@ -114,7 +114,7 @@ for market,base_url in url.items():
         page_content = response.text
 
         # Use regular expressions to extract links to contracts starting with BTC, ETH, or other symbols
-        contract_links = re.findall(r'<a href="((?:ETHUSD|XRP|SOL)[^"]+)">', page_content)
+        contract_links = re.findall(r'<a href="((?:ETHUS|XRP|SOL)[^"]+)">', page_content)
 
 
         for contract_link in contract_links:
