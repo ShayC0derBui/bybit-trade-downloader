@@ -87,12 +87,12 @@ def insert_rows(data, cursor, connection):
 # 'base_url_spot':'https://public.bybit.com/spot/', 'base_url_future': 'https://public.bybit.com/trading/',
 url = { 'base_url_spot':'https://public.bybit.com/spot/'}
 
-# Check if the "temp" directory exists and delete it if it does
-if os.path.exists("temp"):
-    shutil.rmtree("temp")
+# Check if the "temp_spot" directory exists and delete it if it does
+if os.path.exists("temp_spot"):
+    shutil.rmtree("temp_spot")
 
-# Create a "temp" directory
-os.makedirs("temp")
+# Create a "temp_spot" directory
+os.makedirs("temp_spot")
 
 for market,base_url in url.items():
     if market == "base_url_future":
@@ -167,7 +167,7 @@ for market,base_url in url.items():
                     else:
                         csv_url = contract_url + csv_link
                     csv_file_name = os.path.basename(csv_link)
-                    csv_file_path = os.path.join("temp", csv_file_name)
+                    csv_file_path = os.path.join("temp_spot", csv_file_name)
 
                     # Download the CSV file
                     while True:
@@ -184,7 +184,7 @@ for market,base_url in url.items():
 
                         # Check if the downloaded file is a GZIP file and extract it using gzip library
                         if csv_file_name.endswith('.gz'):
-                            extracted_file_path = os.path.join("temp", csv_file_name[:-3])
+                            extracted_file_path = os.path.join("temp_spot", csv_file_name[:-3])
                             with open(csv_file_path, 'rb') as f_in, open(extracted_file_path, 'wb') as f_out:
                                 with gzip.open(f_in, 'rb') as g_in:
                                     f_out.write(g_in.read())
@@ -332,5 +332,5 @@ for market,base_url in url.items():
 cursor.close()
 connection.close()
 
-# Recursively delete the "temp" directory and its contents
-shutil.rmtree("temp")
+# Recursively delete the "temp_spot" directory and its contents
+shutil.rmtree("temp_spot")
