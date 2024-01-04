@@ -1,4 +1,6 @@
 import os
+from pprint import pp, pprint
+from numpy import float16
 import pandas as pd
 import psycopg2.extras
 import requests
@@ -7,12 +9,21 @@ import re
 import shutil
 import time
 from datetime import datetime, timedelta
+import traceback
 
 time_frames = [
-    {"start": datetime.strptime("2010-11-18", "%Y-%m-%d"), "end": datetime.strptime("2025-11-25", "%Y-%m-%d")},
+    {"start": datetime.strptime("2015-12-29", "%Y-%m-%d"), "end": datetime.strptime("2025-11-25", "%Y-%m-%d")},
     # {"start": datetime.strptime("2021-12-06", "%Y-%m-%d"), "end": datetime.strptime("2021-12-13", "%Y-%m-%d")},
     # Add more time frames as needed
 ]
+
+# Function to log exceptions to a text file
+def log_exception(exception):
+    with open("exception_log.txt", "a") as log_file:
+        log_file.write("Exception details:\n")
+        log_file.write(f"{datetime.now()} - {exception}\n")
+        traceback.print_exc(file=log_file)
+        log_file.write("\n\n")
 
 
 # Define your PostgreSQL connection parameters
@@ -21,7 +32,7 @@ port = "5432"  # Replace with your PostgreSQL server's port
 user = "prem"  # Replace with your PostgreSQL username
 password = "prem"  # Replace with your PostgreSQL password
 database = "exchanges_data"  # Replace with your PostgreSQL database name
-table_name = "Trades"  # Replace with your table name
+table_name = "Trades_test"  # Replace with your table name
 
 # Create the initial PostgreSQL connection
 connection = psycopg2.connect(
@@ -36,7 +47,7 @@ cursor = connection.cursor()
 # Function to create or replace the table schema
 def create_table(cursor):
     # Define the SQL statement to drop the existing table if it exists
-    drop_table_query = f"DROP TABLE IF EXISTS {table_name}"
+    # drop_table_query = f"DROP TABLE IF EXISTS {table_name}"
 
     extension_query = "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""
 
@@ -62,7 +73,7 @@ def create_table(cursor):
 
 
     try:
-        cursor.execute(drop_table_query)
+        # cursor.execute(drop_table_query)
         cursor.execute(extension_query)
         cursor.execute(create_table_query)
         connection.commit()
@@ -85,7 +96,7 @@ def insert_rows(data, cursor, connection):
 
 # Replace this with the base URL of your directory listing
 # 'base_url_spot':'https://public.bybit.com/spot/', 'base_url_future': 'https://public.bybit.com/trading/',
-url = {'base_url_future': 'https://public.bybit.com/trading/'}
+url = { 'base_url_future': 'https://public.bybit.com/trading/', 'base_url_spot':'https://public.bybit.com/spot/' }
 
 # Check if the "temp" directory exists and delete it if it does
 if os.path.exists("temp"):
@@ -106,6 +117,7 @@ for market,base_url in url.items():
             response = requests.get(base_url)
             break
         except Exception as e:
+            log_exception(e)
             print(f"Error: {e}")
             print("Retrying in 10 seconds...")
             time.sleep(10)  # Sleep for 10 seconds before retrying
@@ -114,7 +126,7 @@ for market,base_url in url.items():
         page_content = response.text
 
         # Use regular expressions to extract links to contracts starting with BTC, ETH, or other symbols
-        contract_links = re.findall(r'<a href="((?:ETHUS|XRP|SOL)[^"]+)">', page_content)
+        contract_links = re.findall(r'<a href="((?:ADAUSD|BTCUSD|ETHUSD|XRPUSD|SOLUSD|BNBUSD|DOGEUSD)[^"]+)">', page_content)
 
 
         for contract_link in contract_links:
@@ -126,6 +138,7 @@ for market,base_url in url.items():
                     contract_response = requests.get(contract_url)
                     break
                 except Exception as e:
+                    log_exception(e)
                     print(f"Error: {e}")
                     print("Retrying in 10 seconds...")
                     time.sleep(10)  # Sleep for 10 seconds before retrying
@@ -150,18 +163,19 @@ for market,base_url in url.items():
                             # Check if csv_time is within the specified time frame
                             if start_time_frame <= csv_time <= end_time_frame:
                                 csv_links.append(csv_link)
-
-                # Initialize variables
-                this_is_start_row = True
-                open_time = None
-                open_price = 0
-                low_price = float('inf')
-                high_price = 0
-                volume = 0
-                hourly_data = []
-                is_it_the_first_time  = True
+                
+                pprint(csv_links)
 
                 for csv_link in csv_links:
+                    # Initialize variables
+                    this_is_start_row = True
+                    open_time = None
+                    open_price = 0
+                    low_price = float('inf')
+                    high_price = 0
+                    volume = 0
+                    hourly_data = []
+                    is_it_the_first_time  = True
                     if not future:
                         csv_url = contract_url + '/' + csv_link
                     else:
@@ -175,6 +189,7 @@ for market,base_url in url.items():
                             response = requests.get(csv_url)
                             break
                         except Exception as e:
+                            log_exception(e)
                             print(f"Error: {e}")
                             print("Retrying in 10 seconds...")
                             time.sleep(10)  # Sleep for 10 seconds before retrying
@@ -195,15 +210,18 @@ for market,base_url in url.items():
                             try:
                                 df = pd.read_csv(extracted_file_path)
                             except Exception as e:
+                                log_exception(e)
                                 print(f"Error reading CSV file: {e}")
                                 print(f"Skipping file: {extracted_file_path}")
                                 continue
 
                             def create_hourly_row(row, open_time, close_time, low_price, high_price, open_price, close_price, volume):
                                 if not future:
-                                    timestamp = float(row['timestamp'])
+                                    timestamp = float(row['timestamp']) 
                                 else:
-                                    timestamp = float(row['timestamp'])  # Cast timestamp to float
+                                    timestamp = float(row['timestamp']) * 1000
+                                    open_time = open_time * 1000
+                                    close_time = close_time * 1000
 
                                 side = str(row['side']).upper()  # Cast side to string
 
@@ -237,18 +255,18 @@ for market,base_url in url.items():
                             
                             if is_it_the_first_time:
                                 if not future:
-                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0]/1000)
+                                    cur_time = datetime.fromtimestamp(float(df['timestamp'].iloc[0])/1000)
                                 else:
-                                    cur_time = datetime.fromtimestamp(df['timestamp'].iloc[0])
+                                    cur_time = datetime.fromtimestamp(float(df['timestamp'].iloc[0]))
                                     
                                 
-                                # Find the closest next hour to cur_time and set it as start time
-                                if not future:
-                                    start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second, microseconds=cur_time.microsecond)
-                                else:
-                                    start_time = cur_time + timedelta(hours=1) - timedelta(minutes=cur_time.minute, seconds=cur_time.second)
-
+                                # Find the closest hour to cur_time and set it as start time
+                                start_time = cur_time - timedelta(minutes=cur_time.minute, seconds=cur_time.second, microseconds=cur_time.microsecond)
+                                open_time = start_time
+                                open_price = df['price'].iloc[0]
                                 is_it_the_first_time = False
+                            
+                            day_counter = 0
                             for index, row in df.iterrows():
 
                                 if not future:
@@ -266,53 +284,62 @@ for market,base_url in url.items():
                                         market = "INVERSE"
 
                                 if not future:
-                                    trade_time = datetime.fromtimestamp(row['timestamp']/1000)
+                                    trade_time = datetime.fromtimestamp(float(row['timestamp'])/1000)
                                 else:
-                                    trade_time = datetime.fromtimestamp(row['timestamp'])
-                                # Check if we haven't reached start_time, continue to the next loop iteration
-                                if trade_time < start_time:
-                                    continue
-                                else:
-                                    if this_is_start_row:
-                                        this_is_start_row = False
-                                        open_time = start_time
-                                        open_price = row['price']
-                                        if not future:
-                                            volume += float(row['volume'])*float(row['price'])
-                                        else:
-                                            if market=="LINEAR":
-                                                volume += row['foreignNotional']
-                                            elif market=="INVERSE":
-                                                volume += row['homeNotional']
-                                        low_price = min(low_price, row['price'])
-                                        high_price = max(high_price, row['price'])
-                                    else:
-                                        if trade_time < start_time + timedelta(hours=1):
-                                            if not future:
-                                                volume +=  float(row['volume'])*float(row['price'])
-                                            else:
-                                                if market=="LINEAR":
-                                                    volume += row['foreignNotional']
-                                                elif market=="INVERSE":
-                                                    volume += row['homeNotional']
-                                            low_price = min(low_price, row['price'])
-                                            high_price = max(high_price, row['price'])
-                                        else:
-                                            close_price = df['price'].iloc[index-1]
-                                            close_time = start_time + timedelta(hours=1)
-                                            hourly_data.append(create_hourly_row(df.iloc[index-1], datetime.timestamp(open_time), datetime.timestamp(close_time),low_price, high_price, open_price, close_price, volume))
+                                    trade_time = datetime.fromtimestamp(float(row['timestamp']))
 
-                                            # Reset variables for the next hour
-                                            start_time = close_time
-                                            this_is_start_row = True
-                                            open_time = start_time
-                                            open_price = row['price']
-                                            low_price = float('inf')
-                                            high_price = 0
-                                            if not future:
-                                                volume += row['volume']
-                                            else:
-                                                volume += row['homeNotional']
+                                if day_counter == 23:
+                                    close_price = float(df['price'].iloc[df.index[-1]])
+                                    close_time = start_time + timedelta(hours=1)
+                                    if not future:
+                                        volume =  float(df.loc[index:df.index[-1], ['volume', 'price']].prod(axis=1).sum())
+                                    else:
+                                        if market=="LINEAR":
+                                            # volume += row['foreignNotional']
+                                            volume = float(df.loc[index:df.index[-1], 'foreignNotional'].sum())
+                                        elif market=="INVERSE":
+                                            # volume += row['homeNotional']
+                                            volume = float(df.loc[index:df.index[-1], 'homeNotional'].sum())
+                                    # low_price = min(low_price, row['price'])
+                                    # high_price = max(high_price, row['price'])
+                                    low_price = float(df.loc[index:df.index[-1], 'price'].min())
+                                    high_price = float(df.loc[index:df.index[-1], 'price'].max())
+                                    day_counter += 1
+                                    # print(day_counter)
+                                    # print(open_time,close_time)
+                                    
+                                    hourly_data.append(create_hourly_row(df.iloc[df.shape[0]-1], datetime.timestamp(open_time), datetime.timestamp(close_time),low_price, high_price, open_price, close_price, volume))
+                                    break
+                                
+                                elif trade_time < start_time + timedelta(hours=1):
+                                    if not future:
+                                        volume +=  float(row['volume'])*float(row['price'])
+                                    else:
+                                        if market=="LINEAR":
+                                            volume += row['foreignNotional']
+                                        elif market=="INVERSE":
+                                            volume += row['homeNotional']
+                                    low_price = min(low_price, row['price'])
+                                    high_price = max(high_price, row['price'])
+                                else:
+                                    close_price = df['price'].iloc[index-1]
+                                    close_time = start_time + timedelta(hours=1)
+                                    # print(open_time,close_time)
+                                    day_counter += 1
+                                    # print(day_counter)
+                                    hourly_data.append(create_hourly_row(df.iloc[index-1], datetime.timestamp(open_time), datetime.timestamp(close_time),low_price, high_price, open_price, close_price, volume))
+                                    
+
+                                    # Reset variables for the next hour
+                                    start_time = close_time
+                                    open_time = start_time
+                                    open_price = row['price']
+                                    low_price = float('inf')
+                                    high_price = 0
+                                    if not future:
+                                        volume += row['volume']
+                                    else:
+                                        volume += row['homeNotional']
 
                             # Insert the hourly data into the database
                             insert_rows(hourly_data, cursor, connection)
